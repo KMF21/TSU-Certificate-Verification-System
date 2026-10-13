@@ -1,4 +1,5 @@
-import { findBySerial } from '@/lib/credentials'
+import { findFullBySerial } from '@/lib/credentials'
+import { logVerification, resultFor } from '@/lib/events'
 import { claimsMatchCredential } from '@/lib/signing-core'
 import { verifyCertificateToken } from '@/lib/signing'
 import type { SignatureCheckResult } from '@/lib/types'
@@ -11,7 +12,7 @@ const MAX_TOKEN_LENGTH = 2048
  * Checks a QR token's TSU signature and whether it still matches the register.
  * The token travels in the URL fragment, which browsers never send to a server,
  * so the result page posts it here explicitly.
- * TODO(phase-1): rate limit (Upstash) and log to verification_events.
+ * TODO(phase-1): rate limit per IP.
  */
 export async function POST(request: Request) {
   let body: { token?: unknown; code?: unknown }
@@ -33,11 +34,17 @@ export async function POST(request: Request) {
         ? { state: 'unknown-key', keyId: verification.kid ?? '' }
         : { state: 'invalid', reason: verification.reason }
   } else {
-    const record = await findBySerial(verification.claims.s)
+    const record = await findFullBySerial(verification.claims.s)
     const matchesRecord =
       !!record && claimsMatchCredential(verification.claims, record) && (code === null || code === record.verifyCode)
     result = { state: 'valid', matchesRecord, verifyCode: record?.verifyCode ?? null, keyId: verification.kid }
   }
 
+  await logVerification({
+    channel: 'token',
+    code,
+    result: result.state === 'valid' && result.verifyCode ? 'verified' : resultFor(undefined),
+    signature: result.state === 'valid' ? (result.matchesRecord ? 'valid' : 'stale') : result.state === 'unknown-key' ? 'unknown_key' : 'invalid',
+  })
   return Response.json(result, { headers: { 'Cache-Control': 'no-store' } })
 }

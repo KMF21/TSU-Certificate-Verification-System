@@ -1,7 +1,8 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { findBySerialAndMatric } from '@/lib/credentials'
+import { findPublicBySerialAndMatric } from '@/lib/credentials'
+import { logVerification, resultFor } from '@/lib/events'
 
 export interface ManualCheckState {
   error?: string
@@ -18,8 +19,9 @@ export async function verifyByDetails(_prev: ManualCheckState, formData: FormDat
     return { serial, matric, error: 'Enter both the serial number and the matric number printed on the certificate.' }
   }
 
-  // TODO(phase-1): rate limit per IP and log the attempt to verification_events.
-  const record = await findBySerialAndMatric(serial, matric)
+  // TODO(phase-1): rate limit per IP.
+  const record = await findPublicBySerialAndMatric(serial, matric)
+  await logVerification({ channel: 'details', code: record?.verifyCode ?? null, result: resultFor(record?.status) })
   if (!record) {
     return {
       serial,

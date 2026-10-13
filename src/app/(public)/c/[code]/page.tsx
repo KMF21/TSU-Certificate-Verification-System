@@ -3,7 +3,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { BadgeCheck, CircleX, FlaskConical, Mail, Replace, ScanLine, SearchX } from 'lucide-react'
 import clsx from 'clsx'
-import { findByVerifyCode, toPublic } from '@/lib/credentials'
+import { findPublicByCode } from '@/lib/credentials'
+import { logVerification, resultFor } from '@/lib/events'
 import { formatDate, UNIVERSITY } from '@/lib/site'
 import type { PublicCredential } from '@/lib/types'
 import { SignatureCheck } from '@/components/signature-check'
@@ -53,8 +54,8 @@ export default async function ResultPage({
 }) {
   const { code } = await params
   const { via } = await searchParams
-  const record = await findByVerifyCode(code)
-  // TODO(phase-1): log this lookup to verification_events (code, result, country, user agent).
+  const record = await findPublicByCode(code)
+  await logVerification({ channel: via === 'details' ? 'details' : 'link', code, result: resultFor(record?.status) })
 
   const checkedAt = new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'long',
@@ -72,7 +73,7 @@ export default async function ResultPage({
           <span className="text-ink-faint">Checked {checkedAt} (WAT)</span>
         </nav>
 
-        {record ? <RecordCard record={toPublic(record)} via={via === 'details' ? 'details' : null} /> : <NotFoundCard />}
+        {record ? <RecordCard record={record} via={via === 'details' ? 'details' : null} /> : <NotFoundCard />}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row print:hidden">
           <Link href="/?mode=scan#verify" className="btn-primary">
