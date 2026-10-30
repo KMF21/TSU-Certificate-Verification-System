@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { BATCH_STATUS_LABEL, CREDENTIAL_STATUS_LABEL, type BatchStatus, type CredentialStatus } from '@/lib/admin/roles'
+import { SOURCE_LABEL, type RecordSource, type RecordStatus, type VerificationState } from '@/lib/admin/roles'
 
 const TONES = {
   neutral: 'bg-navy-50 text-navy',
@@ -17,19 +17,18 @@ export function Badge({ tone, children }: { tone: keyof typeof TONES; children: 
   )
 }
 
-const BATCH_TONE: Record<BatchStatus, keyof typeof TONES> = { draft: 'neutral', pending: 'info', approved: 'good', rejected: 'warn' }
-const CRED_TONE: Record<CredentialStatus, keyof typeof TONES> = {
-  draft: 'neutral',
-  pending: 'info',
-  approved: 'good',
-  revoked: 'bad',
-  superseded: 'warn',
+/** One badge that sums up where a record stands. */
+export function RecordBadge({ status, source, verification }: { status: RecordStatus; source: RecordSource; verification: VerificationState }) {
+  if (status === 'pending') return <Badge tone="info">Pending</Badge>
+  if (source === 'legacy' && verification === 'unverified') return <Badge tone="warn">Approved · unverified</Badge>
+  return <Badge tone="good">Approved</Badge>
 }
 
-export const BatchBadge = ({ status }: { status: BatchStatus }) => <Badge tone={BATCH_TONE[status]}>{BATCH_STATUS_LABEL[status]}</Badge>
-export const CredentialBadge = ({ status }: { status: CredentialStatus }) => (
-  <Badge tone={CRED_TONE[status]}>{CREDENTIAL_STATUS_LABEL[status]}</Badge>
+export const SourceBadge = ({ source }: { source: RecordSource }) => (
+  <Badge tone={source === 'legacy' ? 'neutral' : 'info'}>{SOURCE_LABEL[source]}</Badge>
 )
+
+export const SampleBadge = () => <Badge tone="warn">Sample</Badge>
 
 export function PageHeader({ title, intro, actions }: { title: string; intro?: React.ReactNode; actions?: React.ReactNode }) {
   return (

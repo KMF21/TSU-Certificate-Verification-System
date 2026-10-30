@@ -3,7 +3,7 @@
 import { randomInt } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { friendlyDbError, requireStaff } from '@/lib/admin/session'
-import { canManageUsers, ROLE_LABEL, type AppRole } from '@/lib/admin/roles'
+import { isAdmin, ROLE_LABEL, type AppRole } from '@/lib/admin/roles'
 import { createServiceClient, hasServiceRole } from '@/lib/supabase/service'
 
 export interface AccountState {
@@ -22,7 +22,7 @@ function temporaryPassword(): string {
 
 async function guard() {
   const session = await requireStaff()
-  if (!session.profile || !canManageUsers(session.profile.role)) throw new Error('Only a Super Admin can manage staff accounts.')
+  if (!session.profile || !isAdmin(session.profile.role)) throw new Error('Only an Admin can manage staff accounts.')
   if (!hasServiceRole()) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set on the server.')
   return session
 }
@@ -48,7 +48,7 @@ export async function createAccountAction(_prev: AccountState, formData: FormDat
     return { error: /already/i.test(error?.message ?? '') ? 'An account with that email address already exists.' : `The account could not be created. ${error?.message ?? ''}` }
   }
 
-  // The role is set as the Super Admin, so the audit log records who granted it.
+  // The role is set as the Admin, so the audit log records who granted it.
   const { error: roleError } = await session.supabase.rpc('save_staff_profile', {
     p_user_id: data.user.id, p_full_name: name, p_email: email, p_role: role, p_active: true,
   })
@@ -90,7 +90,7 @@ export async function resetAccessAction(_prev: AccountState, formData: FormData)
     return { error: (e as Error).message }
   }
   const userId = String(formData.get('user_id'))
-  if (userId === session.user.id) return { error: 'Reset your own access through another Super Admin.' }
+  if (userId === session.user.id) return { error: 'Reset your own access through another Admin.' }
   const { data: current } = await session.supabase.from('profiles').select('full_name, email').eq('user_id', userId).maybeSingle()
   if (!current) return { error: 'Account not found.' }
 

@@ -6,18 +6,10 @@ Built and managed by [KMFenterprise](https://www.kmfenterprise.ng).
 
 ## Status
 
-**Phase 1, slice 2: the register and the approval workflow.**
+**Graduation Records Register, stage 1 of 5: database and roles (applied to Supabase).**
 
-| Done | Next (slice 3) |
-| --- | --- |
-| Public site: QR scanner, manual check, result page, signed QR tokens | Print file and proof sheet export |
-| Supabase register: schema, row-level security, append-only audit log | Corrections, revocation and reissue |
-| Staff sign-in with mandatory two-factor (TOTP) | Rate limiting on public lookups |
-| Roles: Records Officer, CPGS Records Officer, Registrar, Auditor, Super Admin | Production signing key in a cloud KMS |
-| Excel/CSV import with row-by-row checks, all or nothing | |
-| Maker-checker: submit, approve (issues serials and codes) or return | |
-| Programme list import, staff accounts, audit log viewer | |
-| Verification event logging (hashed IPs) | |
+Next: staff interface and single entry → bulk upload → filtered downloads → public verification connection.
+The staff screens on this branch still target the earlier model and are rebuilt in stage 2.
 
 The full requirements live in the shared requirements document.
 
@@ -30,22 +22,41 @@ Each QR code holds a link to `https://<site>/c/<verify-code>#<signed-token>`.
 - TSU's public keys are published at `/.well-known/tsu-keys.json`. Retired keys stay published so older certificates keep verifying.
 - The in-page scanner also checks QR codes that point to other websites, so a lookalike verification site can't vouch for a forged certificate.
 
-## Database
+## Database: Graduation Records Register
 
-Migrations live in `supabase/migrations` and run in filename order. They are tested on plain Postgres 16 with a small Supabase stand-in:
+The register is the single source of truth for graduates, starting with the College of Postgraduate Studies. Migrations live in `supabase/migrations` and run in filename order:
+
+| Migration | What it does |
+| --- | --- |
+| `20261030120000_graduation_register.sql` | Tables, row-level security, audit trail, workflow and public lookup functions |
+| `20261030120100_sample_reference_data.sql` | Class list and the CPGS 2025/2026 programme list, **flagged as sample** until CPGS vets it |
+| `20261030121500_performance_fixes.sql` | Policy and index tuning from the Supabase advisor |
+
+`supabase/seed/sample_records.sql` adds 40 fictional records for testing; `supabase/seed/remove_sample_records.sql` removes them.
+
+### Roles
+
+All staff sign in with two-factor authentication. Without it the database shows them nothing.
+
+| | Viewer | Records Officer | Admin |
+| --- | --- | --- | --- |
+| Search, view, export (exports always logged) | Yes | Yes | Yes |
+| Add or edit pending records, upload files | | Yes | Yes |
+| Edit an approved record (reason required) | | Yes | Yes |
+| Approve or verify records they didn't enter or last edit | | Yes | Yes |
+| Delete records, undo imports, manage staff and reference data | | | Yes |
+
+### Public lookups
+
+Anonymous visitors have no database access. The website's server calls `lookup_by_code` (QR code or link) and `lookup_by_reg_and_surname`, which rate-limit each address (10 a minute, 100 a day), log the attempt and return only: name, programme, level, faculty, class, session, Senate date and certificate serial. Results are `verified`, `under_review` (legacy records not yet verified) or `not_found`.
+
+### Tests
 
 ```bash
 PGHOST=<socket dir> PGPORT=<port> supabase/tests/run.sh
 ```
 
-The tests cover the maker-checker rule, all-or-nothing imports, separate undergraduate (`TSU/2025/000001`) and postgraduate (`TSU/PG/2025/000001`) serials, two-factor-only staff access, anonymous access limited to the two lookup functions, and the append-only audit log.
-
-### First-time setup on Supabase
-
-1. Apply the three migrations in order (SQL editor, or the Supabase CLI).
-2. Check **Authentication → Multi-Factor** has TOTP enabled.
-3. Create the first Super Admin with `supabase/bootstrap_super_admin.sql`.
-4. Sign in at `/admin`, set up two-factor, load the programme list, then create the other staff accounts.
+Runs every migration and the sample seed on a scratch Postgres 16+ with a small Supabase stand-in, then checks roles, two-factor, the two-person rule, approved-record edits, imports and undo, public lookup results, rate limiting and the append-only audit log.
 
 ## Run locally
 

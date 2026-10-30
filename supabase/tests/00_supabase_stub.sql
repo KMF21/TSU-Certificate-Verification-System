@@ -17,3 +17,8 @@ create function auth.uid() returns uuid language sql stable as $$
 $$;
 grant usage on schema auth, extensions to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
+-- Supabase's default privileges: every new table, sequence and function in public is
+-- open to anon, authenticated and service_role until a migration revokes it.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;

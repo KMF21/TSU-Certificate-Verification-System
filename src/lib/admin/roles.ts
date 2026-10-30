@@ -1,59 +1,44 @@
-export type AppRole = 'records_officer' | 'cpgs_records_officer' | 'registrar' | 'auditor' | 'super_admin'
-export type AwardLevel = 'undergraduate' | 'postgraduate'
-export type BatchStatus = 'draft' | 'pending' | 'approved' | 'rejected'
-export type CredentialStatus = 'draft' | 'pending' | 'approved' | 'revoked' | 'superseded'
+export type AppRole = 'admin' | 'records_officer' | 'viewer'
+export type ProgrammeLevel = 'pgd' | 'masters' | 'phd' | 'undergraduate'
+export type RecordStatus = 'pending' | 'approved'
+export type RecordSource = 'live' | 'legacy'
+export type VerificationState = 'verified' | 'unverified'
 
 export const ROLE_LABEL: Record<AppRole, string> = {
-  records_officer: 'Records Officer (Exams & Records)',
-  cpgs_records_officer: 'Records Officer (CPGS)',
-  registrar: 'Registrar',
-  auditor: 'Auditor',
-  super_admin: 'Super Admin',
-}
-
-export const ROLE_SHORT: Record<AppRole, string> = {
+  admin: 'Admin',
   records_officer: 'Records Officer',
-  cpgs_records_officer: 'CPGS Records Officer',
-  registrar: 'Registrar',
-  auditor: 'Auditor',
-  super_admin: 'Super Admin',
+  viewer: 'Viewer',
 }
 
-export const LEVEL_LABEL: Record<AwardLevel, string> = { undergraduate: 'Undergraduate', postgraduate: 'Postgraduate' }
-
-export const BATCH_STATUS_LABEL: Record<BatchStatus, string> = {
-  draft: 'Draft',
-  pending: 'Awaiting approval',
-  approved: 'Approved',
-  rejected: 'Returned for changes',
+export const ROLE_HELP: Record<AppRole, string> = {
+  admin: 'Everything, including staff accounts, programmes, deleting records and undoing imports.',
+  records_officer: 'Add, edit, upload, approve and verify records, and export lists.',
+  viewer: 'Search records and export lists. Can’t change anything.',
 }
 
-export const CREDENTIAL_STATUS_LABEL: Record<CredentialStatus, string> = {
-  draft: 'Draft',
-  pending: 'Awaiting approval',
-  approved: 'Issued',
-  revoked: 'Revoked',
-  superseded: 'Replaced',
+export const LEVEL_LABEL: Record<ProgrammeLevel, string> = {
+  pgd: 'PGD',
+  masters: 'Masters',
+  phd: 'PhD',
+  undergraduate: 'Undergraduate',
 }
 
-/** Which award level a role prepares, if any. */
-export function editableLevel(role: AppRole): AwardLevel | null {
-  if (role === 'records_officer') return 'undergraduate'
-  if (role === 'cpgs_records_officer') return 'postgraduate'
-  return null
+export const STATUS_LABEL: Record<RecordStatus, string> = { pending: 'Pending', approved: 'Approved' }
+export const SOURCE_LABEL: Record<RecordSource, string> = { live: 'Live', legacy: 'Legacy' }
+export const VERIFICATION_LABEL: Record<VerificationState, string> = { verified: 'Verified', unverified: 'Unverified' }
+
+export const canWrite = (role: AppRole) => role === 'admin' || role === 'records_officer'
+export const isAdmin = (role: AppRole) => role === 'admin'
+
+/** Sessions offered in pickers: the current one back to TSU's first graduating sets. */
+export function sessionOptions(now = new Date()): string[] {
+  const end = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear()
+  const out: string[] = []
+  for (let y = end; y >= 2010; y--) out.push(`${y - 1}/${y}`)
+  return out
 }
 
-export const canSeeAudit = (role: AppRole) => role === 'registrar' || role === 'auditor' || role === 'super_admin'
-export const canManageUsers = (role: AppRole) => role === 'super_admin'
-export const canManageReference = (role: AppRole) => role === 'super_admin'
-export const canDecide = (role: AppRole) => role === 'registrar'
-
-export const DEGREE_CLASSES = [
-  'First Class Honours',
-  'Second Class Honours (Upper Division)',
-  'Second Class Honours (Lower Division)',
-  'Third Class Honours',
-  'Pass',
-] as const
-
-export const POSTGRADUATE_GRADES = ['Distinction', 'Merit', 'Pass'] as const
+export function isValidSession(s: string): boolean {
+  const m = s.match(/^(\d{4})\/(\d{4})$/)
+  return !!m && Number(m[2]) === Number(m[1]) + 1
+}
