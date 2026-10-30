@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
 import { ShieldOff } from 'lucide-react'
 import { requireStaff } from '@/lib/admin/session'
-import { canManageUsers, canSeeAudit } from '@/lib/admin/roles'
 import { AdminNav } from '@/components/admin/admin-nav'
 import { signOut } from '../auth-actions'
 
 export const metadata: Metadata = {
-  title: { default: 'Staff area', template: '%s | TSU Verification staff' },
+  title: { default: 'Staff area', template: '%s | CPGS Graduation Register' },
   robots: { index: false, follow: false },
 }
 
@@ -22,7 +21,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
           <ShieldOff className="h-8 w-8 text-status-revoked" aria-hidden />
           <h1 className="mt-4 text-2xl font-semibold">No staff access</h1>
           <p className="mt-2 text-ink-muted">
-            {user.email} is signed in but has no active staff role. Ask a Super Admin in the ICT unit to set one up.
+            {user.email} is signed in but has no active staff role. Ask an Admin of the graduation register to set one up.
           </p>
           <form action={signOut} className="mt-6">
             <button className="btn-outline" type="submit">Sign out</button>
@@ -37,8 +36,6 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       <AdminNav
         name={profile.full_name}
         role={profile.role}
-        showUsers={canManageUsers(profile.role)}
-        showAudit={canSeeAudit(profile.role)}
         signOut={signOut}
       />
       <main id="main" className="min-w-0 flex-1 bg-canvas">

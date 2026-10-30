@@ -1,126 +1,151 @@
 import Link from 'next/link'
-import { ArrowUpRight, FilePlus2 } from 'lucide-react'
+import { ArrowUpRight, PlusCircle, Upload } from 'lucide-react'
 import { requireStaff } from '@/lib/admin/session'
-import { canSeeAudit, editableLevel, LEVEL_LABEL, type AwardLevel, type BatchStatus } from '@/lib/admin/roles'
-import { BatchBadge, Empty, formatDateTime, PageHeader } from '@/components/admin/ui'
+import { canWrite } from '@/lib/admin/roles'
+import { Notice, PageHeader } from '@/components/admin/ui'
 
 export const metadata = { title: 'Overview' }
 
-interface BatchRow {
-  id: string
-  title: string
-  award_level: AwardLevel
-  session: string
-  status: BatchStatus
-  updated_at: string
+interface Stats {
+  total: number
+  pending: number
+  approved: number
+  legacy_unverified: number
+  sample: number
+  by_session: { session: string; approved: number; pending: number }[]
+  by_faculty: { faculty: string; approved: number; pending: number }[]
 }
+
+const fmt = (n: number) => new Intl.NumberFormat('en-GB').format(n)
 
 export default async function OverviewPage() {
   const { supabase, profile } = await requireStaff()
   if (!profile) return null
+  const { data, error } = await supabase.rpc('register_stats')
+  const stats = (data ?? { total: 0, pending: 0, approved: 0, legacy_unverified: 0, sample: 0, by_session: [], by_faculty: [] }) as Stats
+  const writer = canWrite(profile.role)
 
-  const count = (status: string) =>
-    supabase.from('credentials').select('id', { count: 'exact', head: true }).eq('status', status).then((r) => r.count ?? 0)
-
-  const since = new Date(Date.now() - 30 * 864e5).toISOString()
-  const [issued, revoked, superseded, inProgress, pendingBatches, recent, checks] = await Promise.all([
-    count('approved'),
-    count('revoked'),
-    count('superseded'),
-    supabase.from('credentials').select('id', { count: 'exact', head: true }).in('status', ['draft', 'pending']).then((r) => r.count ?? 0),
-    supabase.from('batches').select('id, title, award_level, session, status, updated_at').eq('status', 'pending').order('submitted_at').returns<BatchRow[]>(),
-    supabase.from('batches').select('id, title, award_level, session, status, updated_at').order('updated_at', { ascending: false }).limit(6).returns<BatchRow[]>(),
-    canSeeAudit(profile.role)
-      ? supabase.from('verification_events').select('id', { count: 'exact', head: true }).gte('at', since).then((r) => r.count ?? 0)
-      : Promise.resolve(null),
-  ])
-
-  const level = editableLevel(profile.role)
-  const waiting = pendingBatches.data ?? []
+  const tiles = [
+    { label: 'Records in the register', value: stats.total, href: '/admin/records' },
+    { label: 'Waiting for approval', value: stats.pending, href: '/admin/records?status=pending', tone: stats.pending ? 'text-[#1D4E89]' : '' },
+    { label: 'Approved', value: stats.approved, href: '/admin/records?status=approved' },
+    {
+      label: 'Legacy records not yet verified',
+      value: stats.legacy_unverified,
+      href: '/admin/records?source=legacy&verification=unverified',
+      tone: stats.legacy_unverified ? 'text-status-superseded' : '',
+    },
+  ]
+  const maxFaculty = Math.max(1, ...stats.by_faculty.map((f) => f.approved + f.pending))
 
   return (
     <>
       <PageHeader
-        title={`Good to see you, ${profile.full_name.split(' ')[0]}`}
-        intro={
-          profile.role === 'registrar'
-            ? waiting.length
-              ? `${waiting.length} ${waiting.length === 1 ? 'batch is' : 'batches are'} waiting for your decision.`
-              : 'No batches are waiting for your decision.'
-            : level
-              ? `You prepare ${LEVEL_LABEL[level].toLowerCase()} records for the Registrar to approve.`
-              : 'Here is the state of the register.'
-        }
+        title={`Welcome, ${profile.full_name.split(' ')[0]}`}
+        intro="Graduation records of the College of Postgraduate Studies, Taraba State University."
         actions={
-          level ? (
-            <Link href="/admin/batches/new" className="btn-primary">
-              <FilePlus2 className="h-4 w-4" aria-hidden /> Start a batch
-            </Link>
-          ) : null
+          writer && (
+            <>
+              <Link href="/admin/records/new" className="btn-primary">
+                <PlusCircle className="h-4 w-4" aria-hidden /> Add a record
+              </Link>
+              <Link href="/admin/upload" className="btn-outline">
+                <Upload className="h-4 w-4" aria-hidden /> Bulk upload
+              </Link>
+            </>
+          )
         }
       />
 
-      <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Certificates issued" value={issued} />
-        <Stat label="Records being prepared" value={inProgress} />
-        <Stat label="Revoked or replaced" value={revoked + superseded} />
-        {checks !== null ? <Stat label="Verifications, last 30 days" value={checks} /> : <Stat label="Batches awaiting approval" value={waiting.length} />}
-      </dl>
-
-      {profile.role === 'registrar' && waiting.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold">Waiting for your decision</h2>
-          <BatchList rows={waiting} />
-        </section>
+      {error && <Notice tone="bad">The figures couldn’t be loaded: {error.message}</Notice>}
+      {stats.sample > 0 && (
+        <div className="mb-6">
+          <Notice tone="warn">
+            {fmt(stats.sample)} sample record{stats.sample === 1 ? '' : 's'} are in the register for testing. They are marked “Sample” and will be
+            removed before the register goes live. The programme list is also a sample until CPGS confirms it.
+          </Notice>
+        </div>
       )}
 
-      <section className="mt-10">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent batches</h2>
-          <Link href="/admin/batches" className="text-sm font-semibold text-navy hover:underline">All batches</Link>
-        </div>
-        {recent.data && recent.data.length > 0 ? (
-          <BatchList rows={recent.data} />
-        ) : (
-          <div className="mt-4">
-            <Empty title="No batches yet">
-              {level ? 'Start a batch for a convocation and import its graduating list.' : 'Records Officers create batches from Senate graduating lists.'}
-            </Empty>
-          </div>
-        )}
-      </section>
-    </>
-  )
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="card p-5">
-      <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className="mt-2 font-display text-3xl font-semibold text-navy">{value.toLocaleString('en-NG')}</dd>
-    </div>
-  )
-}
-
-function BatchList({ rows }: { rows: BatchRow[] }) {
-  return (
-    <ul className="mt-4 divide-y divide-line overflow-hidden rounded-card border border-line bg-white">
-      {rows.map((b) => (
-        <li key={b.id}>
-          <Link href={`/admin/batches/${b.id}`} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-canvas/60">
-            <div className="min-w-0">
-              <p className="truncate font-medium text-navy">{b.title}</p>
-              <p className="mt-0.5 text-sm text-ink-muted">
-                {LEVEL_LABEL[b.award_level]}, {b.session} session. Updated {formatDateTime(b.updated_at)}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <BatchBadge status={b.status} />
-              <ArrowUpRight className="h-4 w-4 text-ink-faint" aria-hidden />
-            </div>
+      <section aria-label="Totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {tiles.map((t) => (
+          <Link key={t.label} href={t.href} className="card group p-5 transition-colors hover:border-navy/30">
+            <p className="flex items-start justify-between gap-2 text-sm text-ink-muted">
+              {t.label}
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-ink-faint group-hover:text-navy" aria-hidden />
+            </p>
+            <p className={`mt-3 font-display text-3xl font-semibold tabular-nums text-navy ${t.tone ?? ''}`}>{fmt(t.value)}</p>
           </Link>
-        </li>
-      ))}
-    </ul>
+        ))}
+      </section>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-5">
+        <section className="card p-6 lg:col-span-3">
+          <h2 className="font-display text-lg font-semibold text-navy">By faculty</h2>
+          {stats.by_faculty.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-muted">No records yet.</p>
+          ) : (
+            <ul className="mt-5 space-y-3.5">
+              {stats.by_faculty.map((f) => {
+                const total = f.approved + f.pending
+                return (
+                  <li key={f.faculty}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="truncate text-ink">{f.faculty}</span>
+                      <span className="shrink-0 tabular-nums text-ink-muted">
+                        {fmt(f.approved)} approved{f.pending ? ` · ${fmt(f.pending)} pending` : ''}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-navy-50" aria-hidden>
+                      <div className="bg-navy" style={{ width: `${(f.approved / maxFaculty) * 100}%` }} />
+                      <div className="bg-[#7FA3D6]" style={{ width: `${(f.pending / maxFaculty) * 100}%` }} />
+                    </div>
+                    <span className="sr-only">{total} records</span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <p className="mt-5 flex gap-4 text-xs text-ink-muted">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-navy" /> Approved</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#7FA3D6]" /> Pending</span>
+          </p>
+        </section>
+
+        <section className="card p-6 lg:col-span-2">
+          <h2 className="font-display text-lg font-semibold text-navy">By graduation session</h2>
+          {stats.by_session.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-muted">No records yet.</p>
+          ) : (
+            <table className="mt-4 w-full text-sm">
+              <thead>
+                <tr className="text-left text-ink-muted">
+                  <th className="py-2 font-medium">Session</th>
+                  <th className="py-2 text-right font-medium">Approved</th>
+                  <th className="py-2 text-right font-medium">Pending</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.by_session.map((s) => (
+                  <tr key={s.session} className="border-t border-line">
+                    <td className="py-2.5">
+                      {s.session === 'Not set' ? (
+                        <span className="text-ink-muted">Not set</span>
+                      ) : (
+                        <Link className="text-navy underline-offset-2 hover:underline" href={`/admin/records?session=${encodeURIComponent(s.session)}`}>
+                          {s.session}
+                        </Link>
+                      )}
+                    </td>
+                    <td className="py-2.5 text-right tabular-nums">{fmt(s.approved)}</td>
+                    <td className="py-2.5 text-right tabular-nums text-ink-muted">{fmt(s.pending)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+    </>
   )
 }

@@ -1,14 +1,12 @@
-import { redirect } from 'next/navigation'
-import { requireStaff } from '@/lib/admin/session'
-import { canManageUsers, ROLE_LABEL, type AppRole } from '@/lib/admin/roles'
+import { requireRole } from '@/lib/admin/session'
+import { ROLE_HELP, ROLE_LABEL, type AppRole } from '@/lib/admin/roles'
 import { Badge, formatDateTime, PageHeader } from '@/components/admin/ui'
 import { AccountRow, NewAccountForm } from '@/components/admin/account-forms'
 
 export const metadata = { title: 'Staff accounts' }
 
 export default async function UsersPage() {
-  const { supabase, profile } = await requireStaff()
-  if (!profile || !canManageUsers(profile.role)) redirect('/admin')
+  const { supabase, profile } = await requireRole(['admin'])
   const { data } = await supabase
     .from('profiles')
     .select('user_id, full_name, email, role, active, created_at')
@@ -50,7 +48,20 @@ export default async function UsersPage() {
             </tbody>
           </table>
         </div>
-        <NewAccountForm roles={ROLE_LABEL} />
+        <div className="space-y-6">
+          <NewAccountForm roles={ROLE_LABEL} />
+          <section className="card p-6 text-sm">
+            <h2 className="font-display font-semibold text-navy">What each role can do</h2>
+            <dl className="mt-3 space-y-3">
+              {(Object.keys(ROLE_LABEL) as AppRole[]).map((r) => (
+                <div key={r}>
+                  <dt className="font-medium">{ROLE_LABEL[r]}</dt>
+                  <dd className="text-ink-muted">{ROLE_HELP[r]}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
       </div>
     </>
   )

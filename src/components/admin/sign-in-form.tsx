@@ -26,7 +26,7 @@ export function SignInForm({ next }: { next: string }) {
         {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <LogIn className="h-4 w-4" aria-hidden />}
         {pending ? 'Signing in' : 'Sign in'}
       </button>
-      <p className="text-sm text-ink-muted">Forgotten your password? Ask a Super Admin in the ICT unit to reset it.</p>
+      <p className="text-sm text-ink-muted">Forgotten your password? Ask an Admin of the graduation register to reset it.</p>
     </form>
   )
 }

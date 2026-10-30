@@ -5,20 +5,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import clsx from 'clsx'
-import { BookOpen, FileStack, History, LayoutDashboard, LogOut, Menu, Users, X } from 'lucide-react'
-import { ROLE_SHORT, type AppRole } from '@/lib/admin/roles'
+import { BookOpen, Download, History, LayoutDashboard, ListChecks, LogOut, Menu, PlusCircle, Upload, Users, X } from 'lucide-react'
+import { ROLE_LABEL, type AppRole } from '@/lib/admin/roles'
 
 export function AdminNav({
   name,
   role,
-  showUsers,
-  showAudit,
   signOut,
 }: {
   name: string
   role: AppRole
-  showUsers: boolean
-  showAudit: boolean
   signOut: () => Promise<void>
 }) {
   const pathname = usePathname()
@@ -26,16 +22,27 @@ export function AdminNav({
 
   const items = [
     { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
-    { href: '/admin/batches', label: 'Batches', icon: FileStack },
-    { href: '/admin/programmes', label: 'Programmes', icon: BookOpen },
-    ...(showUsers ? [{ href: '/admin/users', label: 'Staff accounts', icon: Users }] : []),
-    ...(showAudit ? [{ href: '/admin/audit', label: 'Audit log', icon: History }] : []),
+    { href: '/admin/records', label: 'Records', icon: ListChecks },
+    ...(role !== 'viewer'
+      ? [
+          { href: '/admin/records/new', label: 'Add a record', icon: PlusCircle, exact: true },
+          { href: '/admin/upload', label: 'Bulk upload', icon: Upload },
+        ]
+      : []),
+    { href: '/admin/export', label: 'Export', icon: Download },
+    { href: '/admin/reference', label: 'Programmes & classes', icon: BookOpen },
+    ...(role === 'admin'
+      ? [
+          { href: '/admin/users', label: 'Staff accounts', icon: Users },
+          { href: '/admin/audit', label: 'Audit log', icon: History },
+        ]
+      : []),
   ]
 
   const links = (
     <nav aria-label="Staff" className="flex flex-col gap-1">
       {items.map(({ href, label, icon: Icon, exact }) => {
-        const active = exact ? pathname === href : pathname.startsWith(href)
+        const active = exact ? pathname === href : pathname.startsWith(href) && !(href === '/admin/records' && pathname === '/admin/records/new')
         return (
           <Link
             key={href}
@@ -58,7 +65,7 @@ export function AdminNav({
   const footer = (
     <div className="border-t border-white/10 pt-4">
       <p className="truncate text-sm font-medium text-white">{name}</p>
-      <p className="text-xs text-white/60">{ROLE_SHORT[role]}</p>
+      <p className="text-xs text-white/60">{ROLE_LABEL[role]}</p>
       <form action={signOut} className="mt-3">
         <button type="submit" className="flex items-center gap-2 text-sm text-white/70 hover:text-white">
           <LogOut className="h-4 w-4" aria-hidden /> Sign out
@@ -71,7 +78,7 @@ export function AdminNav({
     <Link href="/admin" className="flex items-center gap-3">
       <Image src="/brand/tsu-crest.png" alt="" width={36} height={36} />
       <span className="leading-tight">
-        <span className="block font-display text-sm font-semibold text-white">TSU Verification</span>
+        <span className="block font-display text-sm font-semibold text-white">CPGS Graduation Register</span>
         <span className="block text-xs text-white/60">Staff area</span>
       </span>
     </Link>

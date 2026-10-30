@@ -9,3 +9,4 @@ $P -d tsutest -f supabase/tests/00_supabase_stub.sql >/dev/null
 for f in supabase/migrations/*.sql; do $P -d tsutest -f "$f" >/dev/null 2>&1 || { $P -d tsutest -f "$f"; exit 1; }; done
 $P -d tsutest -f supabase/seed/sample_records.sql >/dev/null
 $P -d tsutest -f supabase/tests/10_register_test.sql | grep -E "PASSED"
+$P -d tsutest -f supabase/tests/20_views_test.sql | grep -E "PASSED"
