@@ -14,12 +14,15 @@ export function RecordFilters({
   reference,
   sessions,
   action = '/admin/records',
+  carry = [],
 }: {
   filters: RegisterFilters
   sort?: string
   reference: Reference
   sessions: string[]
   action?: string
+  /** URL parameters to keep when the filters are applied (e.g. the export's chosen columns). */
+  carry?: string[]
 }) {
   const [faculty, setFaculty] = useState(filters.faculty ?? '')
   const [department, setDepartment] = useState(filters.department ?? '')
@@ -54,6 +57,19 @@ export function RecordFilters({
           }
         }
         setTimeout(() => emptied.forEach((el) => (el.disabled = false)), 0)
+        const current = new URLSearchParams(window.location.search)
+        const form = e.currentTarget
+        form.querySelectorAll('input[data-carried]').forEach((el) => el.remove())
+        for (const k of carry) {
+          const v = current.get(k)
+          if (!v) continue
+          const input = document.createElement('input')
+          input.type = 'hidden'
+          input.name = k
+          input.value = v
+          input.dataset.carried = '1'
+          form.appendChild(input)
+        }
       }}
     >
       <div className="flex flex-col gap-3 sm:flex-row">
