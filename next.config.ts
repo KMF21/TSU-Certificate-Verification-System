@@ -10,6 +10,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Bulk uploads send up to 10,000 checked rows in one request.
+  experimental: { serverActions: { bodySizeLimit: '4mb' } },
   images: {
     remotePatterns: [{ protocol: 'https', hostname: 'www.tsuniversity.edu.ng' }],
   },

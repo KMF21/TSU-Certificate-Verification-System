@@ -118,7 +118,14 @@ select pg_temp.expect_error($$select public.commit_import('bad.xlsx', 'live', js
 select pg_temp.check(not exists (select 1 from public.graduates where reg_number = 'TSU/PG/23/X/0001'), 'failed import saved nothing');
 select pg_temp.expect_error(format($$select public.commit_import('x.xlsx', 'live', jsonb_build_array(jsonb_build_object('action', 'update', 'full_name', 'A B', 'reg_number', %L, 'programme_id', (select id from public.programmes limit 1))))$$,
   (select reg_number from public.graduates where id = (select v from ids where k = 'live1'))), 'already approved');
-select pg_temp.expect_error($$select public.commit_import('x.xlsx', 'live', jsonb_build_array(jsonb_build_object('action', 'create', 'reg_number', 'TSU/PG/23/X/0002', 'programme_id', (select id from public.programmes limit 1))))$$, 'required value');
+select pg_temp.expect_error($$select public.commit_import('x.xlsx', 'live', jsonb_build_array(jsonb_build_object('action', 'create', 'reg_number', 'TSU/PG/23/X/0002', 'programme_id', (select id from public.programmes limit 1))))$$, 'name is missing');
+select pg_temp.expect_error($$select public.commit_import('x.xlsx', 'live', jsonb_build_array(
+  jsonb_build_object('row', '14', 'action', 'create', 'full_name', 'ONE Person', 'reg_number', 'tsu/pg/23/x/0009', 'programme_id', (select id from public.programmes limit 1)),
+  jsonb_build_object('row', '15', 'action', 'create', 'full_name', 'TWO Person', 'reg_number', 'TSU/PG/23/X/0009', 'programme_id', (select id from public.programmes limit 1))))$$,
+  'Row 14: TSU/PG/23/X/0009 appears more than once');
+select pg_temp.expect_error($$select public.commit_import('x.xlsx', 'live', jsonb_build_array(
+  jsonb_build_object('action', 'create', 'full_name', 'ONE Person', 'reg_number', 'TSU/PG/23/X/0010', 'programme_id', (select id from public.programmes limit 1), 'cgpa', 'four')))$$,
+  'couldn’t be read');
 
 -- Importer can't verify own legacy rows; B approves and verifies them.
 select pg_temp.expect_error(format($$select public.verify_records(array(select id from public.graduates where import_batch_id = %L))$$, (select v from ids where k = 'batch1')), 'another officer must verify');
